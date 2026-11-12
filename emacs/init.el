@@ -43,7 +43,6 @@
 (blink-cursor-mode 0)
 (setq-default cursor-in-non-selected-windows nil)
 
-(setq frame-resize-pixelwise t)
 
 (fset 'yes-or-no-p 'y-or-n-p)
 (setq make-backup-files nil)

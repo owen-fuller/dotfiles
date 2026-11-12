@@ -1,9 +1,12 @@
 ;;; early-init.el --- Frame and package startup -*- lexical-binding: t; -*-
 
-;; straight.el handles packages before init.el configures them.
+;; Allow the window manager to size frames from the moment they open.
+;; Keep their outer size when startup changes fonts or frame chrome.
 (setq package-enable-at-startup nil
-      initial-frame-alist '((top . 60) (left . 50) (width . 85) (height . 60)))
+      frame-resize-pixelwise t
+      frame-inhibit-implied-resize t)
 
 ;; Keep native macOS window decorations and the full-path title.
+(add-to-list 'default-frame-alist '(tool-bar-lines . 0))
 (add-to-list 'default-frame-alist '(undecorated . nil))
 (add-to-list 'default-frame-alist '(font . "Iosevka-20"))
