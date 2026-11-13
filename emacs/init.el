@@ -411,32 +411,23 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
   :mode "\\.md\\'")
 (use-package yasnippet
   :hook (prog-mode . yas-minor-mode))
-(use-package eglot
-  :straight nil
-  :commands (eglot eglot-ensure)
+(use-package lsp-mode
+  :commands (lsp lsp-deferred)
   :hook ((prog-mode html-mode mhtml-mode conf-toml-mode yaml-mode yaml-ts-mode)
-         . my/eglot-ensure)
+         . lsp-deferred)
   :init
-  (defun my/eglot-ensure ()
-    "Start Eglot automatically for supported file buffers."
-    (when buffer-file-name
-      (require 'eglot)
-      (when (eglot--lookup-mode major-mode)
-        (eglot-ensure))))
-  :config
-  ;; Keep the existing Python server and add TOML support.
-  (add-to-list 'eglot-server-programs
-               '((python-mode python-ts-mode) . ("pylsp")))
-  (add-to-list 'eglot-server-programs
-               '((conf-toml-mode toml-ts-mode) . ("taplo" "lsp" "stdio"))))
+  (setq lsp-keymap-prefix "C-c l"
+        lsp-log-io nil
+        lsp-idle-delay 0.3
+        lsp-headerline-breadcrumb-enable nil
+        lsp-warn-no-matched-clients nil
+        ;; Load clients only for the languages configured here.
+        lsp-client-packages '(lsp-pylsp lsp-rust lsp-clangd lsp-javascript
+                              lsp-html lsp-css lsp-json lsp-toml lsp-yaml)))
 
 (use-package company
-  :commands company-mode
-  :hook (eglot-managed-mode . my/eglot-company-mode)
+  :hook (lsp-completion-mode . company-mode)
   :init
-  (defun my/eglot-company-mode ()
-    "Enable completion while Eglot manages this buffer."
-    (company-mode (if (eglot-managed-p) 1 -1)))
   (setq company-idle-delay 0.15
         company-minimum-prefix-length 2))
 
