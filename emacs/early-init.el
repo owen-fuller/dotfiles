@@ -9,4 +9,4 @@
 ;; Keep native macOS window decorations and the full-path title.
 (add-to-list 'default-frame-alist '(tool-bar-lines . 0))
 (add-to-list 'default-frame-alist '(undecorated . nil))
-(add-to-list 'default-frame-alist '(font . "Iosevka-20"))
+(add-to-list 'default-frame-alist '(font . "Iosevka-18"))

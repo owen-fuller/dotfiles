@@ -421,8 +421,8 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
         lsp-idle-delay 0.3
         lsp-headerline-breadcrumb-enable nil
         lsp-warn-no-matched-clients nil
-        ;; Load clients only for the languages configured here.
-        lsp-client-packages '(lsp-pylsp lsp-rust lsp-clangd lsp-javascript
+        ;; ty provides Python navigation and completion; Ruff adds linting and formatting.
+        lsp-client-packages '(lsp-python-ty lsp-ruff lsp-rust lsp-clangd lsp-javascript
                               lsp-html lsp-css lsp-json lsp-toml lsp-yaml)))
 
 (use-package company
