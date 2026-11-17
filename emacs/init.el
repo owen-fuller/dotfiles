@@ -1,6 +1,6 @@
 ;;; init.el --- Personal Emacs configuration -*- lexical-binding: t; -*-
 
-;;; Packages
+;;; Package bootstrap
 
 (defvar bootstrap-version)
 (let ((bootstrap-file
@@ -14,57 +14,43 @@
       (goto-char (point-max))
       (eval-print-last-sexp)))
   (load bootstrap-file nil 'nomessage))
+
 (straight-use-package 'use-package)
 (setq straight-use-package-by-default t)
 
 (use-package transient
   :demand t)
 
-;;; Editing and appearance
+;;; Core behavior
 
-(save-place-mode t)
-(global-auto-revert-mode t)
-
-(setq inhibit-startup-message t)
-(setq initial-scratch-message nil)
-
-(setq frame-title-format
-      '(:eval (if buffer-file-name
-                  (expand-file-name buffer-file-name)
-                (buffer-name))))
+(save-place-mode 1)
+(global-auto-revert-mode 1)
 (context-menu-mode 1)
-
-(when (display-graphic-p)
-  (fringe-mode 0)
-  (tool-bar-mode -1)
-  (menu-bar-mode -1)
-  (scroll-bar-mode -1))
-(setq-default cursor-type 'bar)
-(blink-cursor-mode 0)
-(setq-default cursor-in-non-selected-windows nil)
-
+(electric-pair-mode 1)
 
 (fset 'yes-or-no-p 'y-or-n-p)
-(setq make-backup-files nil)
-(setq delete-by-moving-to-trash t
+
+(setq inhibit-startup-message t
+      inhibit-startup-screen t
+      initial-scratch-message nil
+      make-backup-files nil
+      delete-by-moving-to-trash t
       create-lockfiles nil
       auto-save-default nil
-      inhibit-startup-screen t
-      ring-bell-function 'ignore)
-
-(setq native-comp-async-report-warnings-errors 'silent)
-
-(setq-default indent-tabs-mode nil)
-(setq jit-lock-defer-time 0)
-(when (and (display-graphic-p) (fboundp 'pixel-scroll-precision-mode))
-  (pixel-scroll-precision-mode 1))
-(setq redisplay-dont-pause t
+      ring-bell-function #'ignore
+      native-comp-async-report-warnings-errors 'silent
+      help-window-select t
+      jit-lock-defer-time 0
+      redisplay-dont-pause t
       scroll-margin 3
       scroll-conservatively 10000
       scroll-preserve-screen-position 1)
 
-(setq show-paren-delay 0.05)
-(show-paren-mode 1)
+(setq-default indent-tabs-mode nil)
+
+(when (and (display-graphic-p)
+           (fboundp 'pixel-scroll-precision-mode))
+  (pixel-scroll-precision-mode 1))
 
 (use-package exec-path-from-shell
   :if (memq window-system '(mac ns x))
@@ -72,34 +58,34 @@
   :config
   (exec-path-from-shell-initialize))
 
-(use-package all-the-icons
-  :defer t)
-(use-package all-the-icons-completion
-  :after marginalia
-  :config
-  (all-the-icons-completion-marginalia-setup))
+;;; Appearance
 
-(setq custom-safe-themes t)
+(setq frame-title-format
+      '(:eval (if buffer-file-name
+                  (expand-file-name buffer-file-name)
+                (buffer-name)))
+      custom-safe-themes t)
+
+(setq-default cursor-type 'bar
+              cursor-in-non-selected-windows nil
+              display-line-numbers-width 2)
+
+(blink-cursor-mode 0)
+(global-hl-line-mode 1)
+(show-paren-mode 1)
+(setq show-paren-delay 0.05)
+
+(add-hook 'prog-mode-hook #'display-line-numbers-mode)
+(add-hook 'text-mode-hook #'display-line-numbers-mode)
 
 (use-package doom-themes
   :config
   (load-theme 'doom-gruvbox t)
-  (set-face-attribute 'default nil :family "Iosevka" :height 200))
-
-(add-hook 'prog-mode-hook #'display-line-numbers-mode)
-(add-hook 'text-mode-hook #'display-line-numbers-mode)
-(setq-default display-line-numbers-width 2)
-(global-hl-line-mode t)
-
-(use-package solaire-mode
-  :config
-  (solaire-global-mode 1))
-(use-package goggles
-  :hook ((prog-mode text-mode) . goggles-mode)
-  :config
-  (setq-default goggles-pulse t))
-
-;;; Mode line
+  (when (display-graphic-p)
+    (require 'color)
+    (set-face-background
+     'line-number
+     (color-darken-name (face-attribute 'default :background) 2))))
 
 (use-package doom-modeline
   :demand t
@@ -130,7 +116,8 @@
     (if-let* ((file (buffer-file-name (buffer-base-buffer)))
               (directory (file-name-directory file)))
         (let ((prefix (concat (file-name-nondirectory
-                               (directory-file-name directory)) "/")))
+                               (directory-file-name directory))
+                              "/")))
           (when (> (length name) 0)
             (add-text-properties 0 (length prefix)
                                  (text-properties-at 0 name) prefix))
@@ -138,6 +125,7 @@
                                   'doom-modeline-buffer-path nil prefix)
           (concat prefix name))
       name))
+
   (advice-add 'doom-modeline-buffer-file-name :filter-return
               #'my/doom-modeline-parent-folder)
 
@@ -149,120 +137,161 @@
                   doom-modeline-evil-operator-state
                   doom-modeline-evil-emacs-state
                   doom-modeline-evil-user-state))
-    (set-face-attribute face nil :box '(:line-width 1)
-                        :inverse-video t :weight 'bold))
+    (set-face-attribute face nil
+                        :box '(:line-width 1)
+                        :inverse-video t
+                        :weight 'bold))
+
   (doom-modeline-mode 1))
 
-;;; Keys and Evil
+(use-package all-the-icons
+  :defer t)
+
+(use-package all-the-icons-completion
+  :after marginalia
+  :config
+  (all-the-icons-completion-marginalia-setup))
+
+(use-package solaire-mode
+  :config
+  (solaire-global-mode 1))
+
+(use-package goggles
+  :hook ((prog-mode text-mode) . goggles-mode)
+  :config
+  (setq-default goggles-pulse t))
+
+;;; Modal editing
 
 (setq mac-option-modifier 'meta)
 
-(bind-key "s-/" 'comment-line)
-(bind-key "C-q" 'kill-buffer-and-window)
-(bind-key "M-d" 'dired-jump)
+(use-package evil
+  :demand t
+  :bind (:map evil-normal-state-map
+              ("/" . consult-line)
+              ("M-." . embark-dwim)
+              ("s-b" . evil-switch-to-windows-last-buffer)
+              ([escape] . keyboard-quit)
+              :map evil-visual-state-map
+              ([escape] . keyboard-quit))
+  :init
+  (setq evil-normal-state-cursor '(box "red")
+        evil-insert-state-cursor '(bar "green"))
+  :config
+  (evil-mode 1)
+  (dolist (state '((minibuffer-inactive-mode . emacs)
+                   (calendar-mode . emacs)
+                   (grep-mode . emacs)
+                   (Info-mode . emacs)
+                   (term-mode . emacs)
+                   (help-mode . emacs)
+                   (eshell-mode . emacs)
+                   (shell-mode . emacs)
+                   (vterm-mode . emacs)
+                   (dired-mode . emacs)
+                   (compilation-mode . emacs)
+                   (messages-buffer-mode . normal)))
+    (evil-set-initial-state (car state) (cdr state))))
 
-(bind-key "C-c C-p" 'popout)
+(use-package evil-leader
+  :after evil
+  :demand t
+  :config
+  (global-evil-leader-mode 1)
+  (evil-leader/set-leader "<SPC>")
+  (let ((buffer-map (make-sparse-keymap))
+        (code-map (make-sparse-keymap))
+        (git-map (make-sparse-keymap))
+        (open-map (make-sparse-keymap))
+        (project-map (make-sparse-keymap))
+        (search-map (make-sparse-keymap))
+        (window-map (make-sparse-keymap)))
+    (define-key buffer-map (kbd "b") #'consult-buffer)
+    (define-key buffer-map (kbd "i") #'ibuffer)
+    (define-key buffer-map (kbd "k") #'kill-current-buffer)
+    (define-key buffer-map (kbd "n") #'next-buffer)
+    (define-key buffer-map (kbd "p") #'previous-buffer)
+    (define-key buffer-map (kbd "s") #'my/split-to-scratch)
 
-(bind-key "C-c C-r" 'replace-string)
-(bind-key "C-c C-e" 'count-words)
-(bind-key* "C-c C-n" 'next-buffer)
-(bind-key* "s-<left>" 'previous-buffer)
-(bind-key "C-c C-f" 'xref-find-definitions)
-(bind-key "C-c C-s" 'rgrep)
-(bind-key "C-c C-c" 'projectile-find-other-file)
-(bind-key "s-o" 'find-file)
-(bind-key* "M-o" 'open-emacs-config)
+    (define-key code-map (kbd "/") #'comment-or-uncomment-region)
+    (define-key code-map (kbd "a") #'lsp-execute-code-action)
+    (define-key code-map (kbd "c") #'compile)
+    (define-key code-map (kbd "C") #'recompile)
+    (define-key code-map (kbd "d") #'xref-find-definitions)
+    (define-key code-map (kbd "D") #'xref-find-references)
+    (define-key code-map (kbd "f") #'lsp-format-buffer)
+    (define-key code-map (kbd "o") #'lsp-organize-imports)
+    (define-key code-map (kbd "r") #'lsp-rename)
+    (define-key code-map (kbd "w") #'delete-trailing-whitespace)
+    (define-key code-map (kbd "x") #'consult-flymake)
 
-(bind-key "`" "\\")
+    (define-key git-map (kbd "g") #'magit-status)
 
-(defun open-kitty ()
-  (interactive)
-  (start-process "kitty" nil "kitty"))
+    (define-key open-map (kbd "d") #'dirvish-side)
+    (define-key open-map (kbd "k") #'my/open-kitty)
+    (define-key open-map (kbd "p") #'popper-toggle)
+    (define-key open-map (kbd "P") #'popper-cycle)
+    (define-key open-map (kbd "t") #'popper-toggle-type)
 
-(defun open-emacs-config ()
-  (interactive)
-  (find-file (expand-file-name "init.el" user-emacs-directory)))
+    (define-key project-map (kbd "b") #'projectile-switch-to-buffer)
+    (define-key project-map (kbd "d") #'projectile-dired)
+    (define-key project-map (kbd "f") #'projectile-find-file)
+    (define-key project-map (kbd "p") #'projectile-switch-project)
 
-(defun popout ()
-  (interactive)
-  (make-frame)
-  (other-frame 1))
+    (define-key search-map (kbd "b") #'consult-line)
+    (define-key search-map (kbd "f") #'consult-find)
+    (define-key search-map (kbd "g") #'consult-git-grep)
+    (define-key search-map (kbd "i") #'consult-imenu)
+    (define-key search-map (kbd "r") #'consult-ripgrep)
 
-(use-package evil)
-(evil-mode 1)
+    (define-key window-map (kbd "=") #'balance-windows)
+    (define-key window-map (kbd "d") #'delete-window)
+    (define-key window-map (kbd "h") #'evil-window-left)
+    (define-key window-map (kbd "j") #'evil-window-down)
+    (define-key window-map (kbd "k") #'evil-window-up)
+    (define-key window-map (kbd "l") #'evil-window-right)
+    (define-key window-map (kbd "o") #'delete-other-windows)
+    (define-key window-map (kbd "s") #'evil-window-split)
+    (define-key window-map (kbd "v") #'evil-window-vsplit)
 
-(dolist (p '((minibuffer-inactive-mode . emacs)
-             (calendar-mode . emacs)
-             (grep-mode . emacs)
-             (Info-mode . emacs)
-             (term-mode . emacs)
-             (help-mode . emacs)
-             (eshell-mode . emacs)
-             (shell-mode . emacs)
-             (vterm-mode . emacs)
-             (dired-mode . emacs)
-             (compilation-mode . emacs)
-             (messages-buffer-mode . normal)))
-  (evil-set-initial-state (car p) (cdr p)))
+    (define-key help-map (kbd "F") #'describe-face)
+    (define-key help-map (kbd "'") #'describe-char)
+    (define-key help-map (kbd "P") #'find-library)
 
-(define-key evil-normal-state-map (kbd "/") 'consult-line)
-(define-key evil-normal-state-map (kbd "M-.") 'embark-dwim)
-(define-key evil-normal-state-map (kbd "s-b") 'evil-switch-to-windows-last-buffer)
+    (evil-leader/set-key
+     "SPC" #'projectile-find-file
+     ";" #'execute-extended-command
+     ":" #'eval-expression
+     "~" #'popper-toggle
+     "b" buffer-map
+     "c" code-map
+     "d" #'dired-jump
+     "f" #'find-file
+     "g" git-map
+     "h" help-map
+     "o" open-map
+     "p" project-map
+     "q" #'save-buffers-kill-emacs
+     "s" search-map
+     "w" window-map
+     "x" #'my/split-to-scratch)
 
-(setq evil-normal-state-cursor '(box "red")
-      evil-insert-state-cursor '(bar "green"))
-
-(use-package evil-leader)
-
-(global-evil-leader-mode)
-
-(evil-leader/set-leader "<SPC>")
-(evil-leader/set-key
- ";" 'execute-extended-command
- ":" 'eval-expression
- "x" 'execute-extended-command
- "d" 'dired-jump
- "n" 'dirvish-side
- "b" 'ibuffer
- "e" 'dirvish-side
- "f" 'find-file
- "s" '(lambda ()
-        (interactive)
-        (split-window-horizontally)
-        (switch-to-buffer "*scratch*")
-        (balance-windows))
- "o" 'open-emacs-config
- "g" 'magit-status
- "p" 'evil-buffer
- "w" 'save-buffer
- "k" 'open-kitty
- "q" 'save-buffers-kill-emacs
- "cr" 'comment-or-uncomment-region)
-
-(defun minibuffer-keyboard-quit ()
-  "Abort recursive edit.
-In Delete Selection mode, if the mark is active, just deactivate it;
-then it takes a second \\[keyboard-quit] to abort the minibuffer."
-  (interactive)
-  (if (and delete-selection-mode transient-mark-mode mark-active)
-      (setq deactivate-mark  t)
-    (when (get-buffer "*Completions*") (delete-windows-on "*Completions*"))
-    (abort-recursive-edit)))
-(define-key evil-normal-state-map [escape] 'keyboard-quit)
-(define-key evil-visual-state-map [escape] 'keyboard-quit)
-(define-key minibuffer-local-map [escape] 'minibuffer-keyboard-quit)
-(define-key minibuffer-local-ns-map [escape] 'minibuffer-keyboard-quit)
-(define-key minibuffer-local-completion-map [escape] 'minibuffer-keyboard-quit)
-(define-key minibuffer-local-must-match-map [escape] 'minibuffer-keyboard-quit)
-(define-key minibuffer-local-isearch-map [escape] 'minibuffer-keyboard-quit)
-
-(setq help-window-select t)
+    (with-eval-after-load 'which-key
+      (which-key-add-key-based-replacements
+       "SPC b" "buffer"
+       "SPC c" "code"
+       "SPC g" "git"
+       "SPC h" "help"
+       "SPC o" "open"
+       "SPC p" "project"
+       "SPC s" "search"
+       "SPC w" "window"))))
 
 ;;; Completion and search
 
 (use-package vertico
   :init
-  (vertico-mode))
+  (vertico-mode 1))
 
 (use-package vertico-directory
   :straight nil
@@ -276,25 +305,47 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
 (use-package savehist
   :straight nil
   :init
-  (savehist-mode))
+  (savehist-mode 1))
 
 (use-package emacs
   :straight nil
+  :bind (("s-/" . comment-line)
+         ("C-q" . kill-buffer-and-window)
+         ("C-c C-p" . my/popout)
+         ("C-c C-r" . replace-string)
+         ("C-c C-e" . count-words)
+         ("s-o" . find-file)
+         ("`" . "\\")
+         :map minibuffer-local-map
+         ([escape] . my/minibuffer-keyboard-quit)
+         :map minibuffer-local-ns-map
+         ([escape] . my/minibuffer-keyboard-quit)
+         :map minibuffer-local-completion-map
+         ([escape] . my/minibuffer-keyboard-quit)
+         :map minibuffer-local-must-match-map
+         ([escape] . my/minibuffer-keyboard-quit)
+         :map minibuffer-local-isearch-map
+         ([escape] . my/minibuffer-keyboard-quit))
+  :bind* (("C-c C-n" . next-buffer)
+          ("s-<left>" . previous-buffer)
+          ("M-o" . my/open-emacs-config))
   :init
-  (defun crm-indicator (args)
+  (defun my/crm-indicator (args)
+    "Add a multiple-selection indicator to completion prompt ARGS."
     (cons (format "[CRM%s] %s"
                   (replace-regexp-in-string
-                   "\\`\\[.*?]\\*\\|\\[.*?]\\*\\'" ""
+                   "\\`\\[.*?\\]\\*\\|\\[.*?\\]\\*\\'" ""
                    crm-separator)
                   (car args))
           (cdr args)))
-  (advice-add #'completing-read-multiple :filter-args #'crm-indicator)
+
+  (advice-add #'completing-read-multiple :filter-args #'my/crm-indicator)
 
   (setq minibuffer-prompt-properties
-        '(read-only t cursor-intangible t face minibuffer-prompt))
-  (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
+        '(read-only t cursor-intangible t face minibuffer-prompt)
+        enable-recursive-minibuffers t)
 
-  (setq enable-recursive-minibuffers t))
+  (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode))
 
 (use-package orderless
   :init
@@ -307,13 +358,12 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
          :map minibuffer-local-map
          ("M-A" . marginalia-cycle))
   :init
-  (marginalia-mode))
+  (marginalia-mode 1))
 
 (use-package embark
-  :bind
-  (("C-." . embark-act)
-   ("M-." . embark-dwim)
-   ("C-h B" . embark-bindings))
+  :bind (("C-." . embark-act)
+         ("M-." . embark-dwim)
+         ("C-h B" . embark-bindings))
   :init
   (setq prefix-help-command #'embark-prefix-help-command)
   :config
@@ -323,14 +373,21 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
                  (window-parameters (mode-line-format . none)))))
 
 (use-package embark-consult
-  :hook
-  (embark-collect-mode . consult-preview-at-point-mode))
+  :hook (embark-collect-mode . consult-preview-at-point-mode))
+
+(use-package xref
+  :straight nil
+  :bind ("C-c C-f" . xref-find-definitions))
+
+(use-package grep
+  :straight nil
+  :bind ("C-c C-s" . rgrep))
 
 (use-package igrep
   :commands (igrep igrep-find))
 
 (use-package consult
-  :bind (
+  :bind (("s-f" . consult-ripgrep)
          ("C-c h" . consult-history)
          ("C-c m" . consult-mode-command)
          ("C-c k" . consult-kmacro)
@@ -373,21 +430,15 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
          :map minibuffer-local-map
          ("M-s" . consult-history)
          ("M-r" . consult-history))
-
   :hook (completion-list-mode . consult-preview-at-point-mode)
-
   :init
-
   (setq register-preview-delay 0.5
-        register-preview-function #'consult-register-format)
-
-  (advice-add #'register-preview :override #'consult-register-window)
-
-  (setq xref-show-xrefs-function #'consult-xref
+        register-preview-function #'consult-register-format
+        xref-show-xrefs-function #'consult-xref
         xref-show-definitions-function #'consult-xref)
 
+  (advice-add #'register-preview :override #'consult-register-window)
   :config
-
   (consult-customize
    consult-theme :preview-key '(:debounce 0.2 any)
    consult-ripgrep consult-git-grep consult-grep
@@ -405,14 +456,19 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
   :bind (("M-$" . jinx-correct)
          ("C-M-$" . jinx-languages)))
 
-(electric-pair-mode t)
-
 (use-package markdown-mode
   :mode "\\.md\\'")
+
 (use-package yasnippet
   :hook (prog-mode . yas-minor-mode))
+
 (use-package lsp-mode
-  :commands (lsp lsp-deferred)
+  :commands (lsp
+             lsp-deferred
+             lsp-execute-code-action
+             lsp-format-buffer
+             lsp-organize-imports
+             lsp-rename)
   :hook ((prog-mode html-mode mhtml-mode conf-toml-mode yaml-mode yaml-ts-mode)
          . lsp-deferred)
   :init
@@ -421,9 +477,11 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
         lsp-idle-delay 0.3
         lsp-headerline-breadcrumb-enable nil
         lsp-warn-no-matched-clients nil
+        lsp-file-watch-threshold nil
         ;; ty provides Python navigation and completion; Ruff adds linting and formatting.
-        lsp-client-packages '(lsp-python-ty lsp-ruff lsp-rust lsp-clangd lsp-javascript
-                              lsp-html lsp-css lsp-json lsp-toml lsp-yaml)))
+        lsp-client-packages '(lsp-python-ty lsp-ruff lsp-rust lsp-clangd
+                              lsp-javascript lsp-html lsp-css lsp-json
+                              lsp-toml lsp-yaml)))
 
 (use-package company
   :hook (lsp-completion-mode . company-mode)
@@ -443,67 +501,62 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
 (use-package yaml-mode
   :mode "\\.ya?ml\\'")
 
-(use-package bufler
-  :bind* ("M-b" . bufler-switch-buffer))
-
-(use-package which-key
-  :config
-  (which-key-mode))
-
 ;;; Files
 
+(use-package dired
+  :straight nil
+  :bind (("M-d" . dired-jump)
+         :map dired-mode-map
+         ("<left>" . dired-up-directory)
+         ("<right>" . dired-find-file)))
+
 (use-package all-the-icons-dired
-  :defer t
-  :init
-  (add-hook 'dired-mode-hook 'all-the-icons-dired-mode))
+  :hook (dired-mode . all-the-icons-dired-mode))
 
 (use-package diredfl
-  :hook
-  ((dired-mode . diredfl-mode)
-   (dirvish-directory-view-mode . diredfl-mode))
+  :hook ((dired-mode . diredfl-mode)
+         (dirvish-directory-view-mode . diredfl-mode))
   :config
   (set-face-attribute 'diredfl-dir-name nil :bold t))
 
 (use-package dirvish
+  :bind (("C-c f" . dirvish-fd)
+         :map dirvish-mode-map
+         ("h" . dired-up-directory)
+         ("j" . dired-next-line)
+         ("k" . dired-previous-line)
+         ("l" . dired-find-file)
+         ("." . dired-omit-mode)
+         ("b" . dirvish-bookmark-jump)
+         ("f" . dirvish-file-info-menu)
+         ("y" . dirvish-yank-menu)
+         ("N" . dirvish-narrow)
+         ("^" . dirvish-history-last)
+         ("s" . dirvish-quicksort)
+         ("TAB" . dirvish-subtree-toggle)
+         ("M-n" . dirvish-history-go-forward)
+         ("M-p" . dirvish-history-go-backward)
+         ("M-l" . dirvish-ls-switches-menu)
+         ("M-m" . dirvish-mark-menu)
+         ("M-f" . dirvish-toggle-fullscreen)
+         ("M-s" . dirvish-setup-menu)
+         ("M-e" . dirvish-emerge-menu)
+         ("M-j" . dirvish-fd-jump))
   :init
   (dirvish-override-dired-mode)
   :custom
   (dirvish-bookmark-entries
-   '(("H" "~/"                          "Home")
-     ("d" "~/Downloads/"                "Downloads")
+   '(("H" "~/" "Home")
+     ("d" "~/Downloads/" "Downloads")
      ("m" "/Volumes/" "Drives")
      ("t" "~/.Trash/" "Trash")))
   (dirvish-header-line-format '(:left (path) :right (free-space)))
+  (dirvish-preview-disabled-exts '("iso" "bin" "exe" "gpg" "elc" "eln"))
   :config
-  (setq dirvish-preview-disabled-exts '("iso" "bin" "exe" "gpg" "elc" "eln"))
-  (dirvish-peek-mode)
-  (setq dired-dwim-target t)
-  (setq dired-mouse-drag-files t)
-  (setq mouse-drag-and-drop-region-cross-program t)
-
-  :bind
-  (("C-c f" . dirvish-fd)
-   :map dirvish-mode-map
-   ("h" . dired-up-directory)
-   ("j" . dired-next-line)
-   ("k" . dired-previous-line)
-   ("l" . dired-find-file)
-   ("." . dired-omit-mode)
-   ("b"   . dirvish-bookmark-jump)
-   ("f"   . dirvish-file-info-menu)
-   ("y"   . dirvish-yank-menu)
-   ("N"   . dirvish-narrow)
-   ("^"   . dirvish-history-last)
-   ("s"   . dirvish-quicksort)
-   ("TAB" . dirvish-subtree-toggle)
-   ("M-n" . dirvish-history-go-forward)
-   ("M-p" . dirvish-history-go-backward)
-   ("M-l" . dirvish-ls-switches-menu)
-   ("M-m" . dirvish-mark-menu)
-   ("M-f" . dirvish-toggle-fullscreen)
-   ("M-s" . dirvish-setup-menu)
-   ("M-e" . dirvish-emerge-menu)
-   ("M-j" . dirvish-fd-jump)))
+  (dirvish-peek-mode 1)
+  (setq dired-dwim-target t
+        dired-mouse-drag-files t
+        mouse-drag-and-drop-region-cross-program t))
 
 (when-let* ((gls (executable-find "gls")))
   (setq insert-directory-program gls))
@@ -512,10 +565,12 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
 
 (use-package magit
   :defer t)
+
 (use-package projectile
   :demand t
-  :bind (:map projectile-mode-map
-              ("s-p" . projectile-command-map))
+  :bind (("C-c C-c" . projectile-find-other-file)
+         :map projectile-mode-map
+         ("s-p" . projectile-command-map))
   :config
   (projectile-mode 1))
 
@@ -537,18 +592,22 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
 
 ;;; Compilation and utility buffers
 
+(use-package compile
+  :straight nil
+  :defer t
+  :bind ("s-<return>" . recompile)
+  :init
+  (setq compilation-ask-about-save nil))
+
 (use-package smart-compile
   :commands smart-compile
   :config
   (add-to-list 'smart-compile-alist '("\\.js$" . "node %f")))
+
 (use-package fancy-compilation
-  :commands (fancy-compilation-mode))
-(with-eval-after-load 'compile
-  (fancy-compilation-mode))
-
-(bind-key "s-<return>" 'recompile)
-
-(setq compilation-ask-about-save nil)
+  :after compile
+  :config
+  (fancy-compilation-mode 1))
 
 (use-package leetcode
   :defer t)
@@ -562,23 +621,84 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
   :mode "\\.csv\\'")
 
 (use-package popper
-  :bind (("C-`"   . popper-toggle)
-         ("M-`"   . popper-cycle)
+  :bind (("C-`" . popper-toggle)
+         ("M-`" . popper-cycle)
          ("C-M-`" . popper-toggle-type))
   :init
   (setq popper-reference-buffers
         '("\\*Messages\\*"
+          "\\*Warnings\\*"
+          "\\*Backtrace\\*"
           "Output\\*$"
           "\\*Async Shell Command\\*"
+          "\\*Shell Command Output\\*"
+          "\\*Apropos\\*"
+          "\\*Occur\\*"
+          "\\*grep\\*"
+          "\\*xref\\*"
+          "\\*Flymake diagnostics.*\\*"
+          "^\\*eshell.*\\*$"
+          "^\\*shell.*\\*$"
+          "^\\*term.*\\*$"
+          "^\\*vterm.*\\*$"
           help-mode
-          compilation-mode))
-  (popper-mode +1)
-  (popper-echo-mode +1))
+          apropos-mode
+          compilation-mode
+          grep-mode
+          occur-mode
+          xref--xref-buffer-mode
+          flymake-diagnostics-buffer-mode
+          eshell-mode
+          shell-mode
+          term-mode
+          vterm-mode)
+        popper-display-control t
+        popper-group-function #'popper-group-by-projectile)
+  (popper-mode 1)
+  (popper-echo-mode 1))
 
-(when (display-graphic-p)
-  (require 'color)
-  (set-face-background 'line-number
-                       (color-darken-name (face-attribute 'default :background) 2)))
+(use-package bufler
+  :bind* ("M-b" . bufler-switch-buffer))
 
+(use-package which-key
+  :config
+  (which-key-mode 1))
 
-(straight-use-package 'gptel)
+(use-package gptel
+  :defer t)
+
+;;; Helper commands
+
+(defun my/open-kitty ()
+  "Open a new Kitty terminal."
+  (interactive)
+  (start-process "kitty" nil "kitty"))
+
+(defun my/open-emacs-config ()
+  "Open this Emacs configuration."
+  (interactive)
+  (find-file (expand-file-name "init.el" user-emacs-directory)))
+
+(defun my/popout ()
+  "Open the current session in another frame."
+  (interactive)
+  (make-frame)
+  (other-frame 1))
+
+(defun my/split-to-scratch ()
+  "Split the current window and show the scratch buffer."
+  (interactive)
+  (split-window-horizontally)
+  (switch-to-buffer "*scratch*")
+  (balance-windows))
+
+(defun my/minibuffer-keyboard-quit ()
+  "Abort a recursive edit, or deactivate an active region first."
+  (interactive)
+  (if (and delete-selection-mode transient-mark-mode mark-active)
+      (setq deactivate-mark t)
+    (when (get-buffer "*Completions*")
+      (delete-windows-on "*Completions*"))
+    (abort-recursive-edit)))
+
+;;; init.el ends here
