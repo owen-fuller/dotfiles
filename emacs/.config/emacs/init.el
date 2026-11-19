@@ -2,6 +2,10 @@
 
 ;;; Package bootstrap
 
+;; Detect edits saved in Emacs; check external edits explicitly with
+;; `straight-check-all' rather than scanning package sources at startup.
+(setq straight-check-for-modifications '(check-on-save find-when-checking))
+
 (defvar bootstrap-version)
 (let ((bootstrap-file
        (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
@@ -189,6 +193,8 @@
                    (shell-mode . emacs)
                    (vterm-mode . emacs)
                    (dired-mode . emacs)
+                   (dashboard-mode . emacs)
+                   (welcome-dashboard-mode . normal)
                    (compilation-mode . emacs)
                    (messages-buffer-mode . normal)))
     (evil-set-initial-state (car state) (cdr state))))
@@ -580,15 +586,100 @@
   (setq recentf-max-saved-items 100)
   (recentf-mode 1))
 
+(defvar old_dashboard nil
+  "When non-nil, use the original dashboard instead of welcome-dashboard.
+Set before loading this configuration, or change here and restart Emacs.")
+
 (use-package dashboard
+  :if old_dashboard
   :demand t
   :init
   (setq dashboard-startup-banner 'official
+        dashboard-image-extra-props '(:height 200)
+        dashboard-banner-logo-title nil
+        dashboard-center-content t
         dashboard-projects-backend 'projectile
         dashboard-projects-switch-function #'projectile-switch-project-by-name
-        dashboard-items '((recents . 8) (projects . 5) (bookmarks . 5)))
+        dashboard-items '((recents . 8) (projects . 5)))
   :config
   (dashboard-setup-startup-hook))
+
+(use-package welcome-dashboard
+  :if (not old_dashboard)
+  :straight (welcome-dashboard :type git :host github
+                               :repo "konrad1977/welcome-dashboard"
+                               :files ("welcome-dashboard.el"))
+  :demand t
+  :init
+  (setq welcome-dashboard-use-nerd-icons t
+        welcome-dashboard-max-number-of-recent-files 8
+        welcome-dashboard-max-number-of-projects 5
+        welcome-dashboard-max-number-of-todos 0)
+  :config
+  (defun my/welcome-dashboard-insert-banner (&rest _)
+    "Insert the original Emacs image above the welcome dashboard."
+    (let ((image-file (expand-file-name "assets/emacs.png" user-emacs-directory)))
+      (when (and (display-graphic-p)
+                 (image-type-available-p 'png)
+                 (file-exists-p image-file))
+        (with-current-buffer welcome-dashboard-buffer
+          (let ((inhibit-read-only t)
+                (image (create-image image-file 'png nil :height 200)))
+            (save-excursion
+              (goto-char (point-min))
+              (insert (propertize " " 'display
+                                  `(space :align-to (- center (0.5 . ,image)))))
+              (insert-image image)
+              (insert "\n\n")))))))
+  (advice-add 'welcome-dashboard--refresh-screen :after
+              #'my/welcome-dashboard-insert-banner)
+
+  (defun my/welcome-dashboard-projectile-projects ()
+    "Return Projectile projects for the welcome dashboard."
+    (seq-take (projectile-relevant-known-projects)
+              welcome-dashboard-max-number-of-projects))
+
+  (defun my/welcome-dashboard-refresh-projects (&rest _)
+    "Refresh dashboard projects from Projectile before rendering."
+    (setq welcome-dashboard-recent-projects
+          (my/welcome-dashboard-projectile-projects)))
+
+  (defun my/welcome-dashboard-open-project (index)
+    "Switch to the displayed Projectile project at INDEX."
+    (when (<= 1 index (length welcome-dashboard-recent-projects))
+      (projectile-switch-project-by-name
+       (nth (1- index) welcome-dashboard-recent-projects))))
+
+  (advice-add 'welcome-dashboard--get-recent-projects :override
+              #'my/welcome-dashboard-projectile-projects)
+  (advice-add 'welcome-dashboard--refresh-screen :before
+              #'my/welcome-dashboard-refresh-projects)
+  (advice-add 'welcome-dashboard--open-project-at-index :override
+              #'my/welcome-dashboard-open-project)
+
+  (dotimes (index 9)
+    (let ((number (1+ index)))
+      (define-key welcome-dashboard-mode-map (kbd (format "M-%d" number)) nil)
+      (evil-define-key 'normal welcome-dashboard-mode-map (kbd (format "C-%d" number))
+                  (lambda ()
+                    (interactive)
+                    (welcome-dashboard--open-project-at-index number)))
+      (evil-define-key 'normal welcome-dashboard-mode-map (kbd (format "C-M-%d" number))
+                  (lambda ()
+                    (interactive)
+                    (welcome-dashboard--open-recent-file-at-index number)))))
+
+  (defun my/welcome-dashboard-shortcut-hints (args)
+    "Match dashboard shortcut hints to the customized bindings."
+    (pcase (plist-get args :shortcut-face)
+      ('welcome-dashboard-recent-project-shortcut-face
+       (setq args (plist-put args :shortcut-modifier "C-")))
+      ('welcome-dashboard-recent-file-shortcut-face
+       (setq args (plist-put args :shortcut-modifier "C-M-"))))
+    args)
+  (advice-add 'welcome-dashboard--insert-two-columns :filter-args
+              #'my/welcome-dashboard-shortcut-hints)
+  (welcome-dashboard-create-welcome-hook))
 
 ;;; Compilation and utility buffers
 

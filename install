@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+default_packages=(aerospace emacs kitty)
+
+if ! command -v stow >/dev/null 2>&1; then
+  printf 'GNU Stow is required. On macOS, install it with: brew install stow\n' >&2
+  exit 1
+fi
+
+if (( $# > 0 )); then
+  packages=("$@")
+else
+  packages=("${default_packages[@]}")
+fi
+
+for package in "${packages[@]}"; do
+  case "$package" in
+    ''|.*|*/*)
+      printf 'Invalid package name: %s\n' "$package" >&2
+      exit 1
+      ;;
+  esac
+
+  if [[ ! -d "$repo_dir/$package" ]]; then
+    printf 'Unknown package: %s\n' "$package" >&2
+    exit 1
+  fi
+
+  # Migrate the whole-directory links used before this repository adopted
+  # Stow. Preserve any application-created state as local files.
+  legacy_target="$HOME/.config/$package"
+  if [[ -L "$legacy_target" ]] &&
+     [[ "$(cd -- "$legacy_target" && pwd -P)" == "$repo_dir/$package" ]]; then
+    unlink "$legacy_target"
+    mkdir -p "$legacy_target"
+    find "$repo_dir/$package" \
+      -mindepth 1 \
+      -maxdepth 1 \
+      ! -name .config \
+      -exec mv -n {} "$legacy_target/" \;
+  fi
+done
+
+stow \
+  --dir="$repo_dir" \
+  --target="$HOME" \
+  --restow \
+  --no-folding \
+  "${packages[@]}"
+
+printf 'Stowed %s into %s\n' "${packages[*]}" "$HOME"
